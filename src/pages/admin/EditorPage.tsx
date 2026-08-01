@@ -17,6 +17,8 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { apiFetch } from "../../lib/api";
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 
 import {
   Save,
@@ -60,7 +62,14 @@ export function EditorPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([
+    { id: "c3", name: "Getting Started", slug: "getting-started" },
+    { id: "c4", name: "Tutorials", slug: "tutorials" },
+    { id: "c2", name: "Success Stories", slug: "success-stories" },
+    { id: "c1", name: "Product Updates", slug: "product-updates" },
+    { id: "c5", name: "Bitcoin & Lightning", slug: "bitcoin-lightning" },
+    { id: "c6", name: "Insights", slug: "insights" },
+  ]);
   const [featuredImage, setFeaturedImage] = useState("");
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState<"cover" | "inline">("cover");
@@ -101,7 +110,11 @@ export function EditorPage() {
   useEffect(() => {
     fetch("/api/categories")
       .then((r) => r.json())
-      .then(setCategories)
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCategories(data);
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -142,44 +155,69 @@ export function EditorPage() {
   // Fetch Existing Article
   useEffect(() => {
     if (id && id !== "new") {
-      fetch(`/api/articles/${id}`)
-        .then((r) => r.json())
-        .then((data) => {
-          setTitle(data.title || "");
-          setSubtitle(data.subtitle || "");
-          setFeaturedImage(data.featured_image || "");
-          setCategoryId(data.category_id || "");
-          editor?.commands.setContent(data.content || "");
+      const loadArticle = async () => {
+        try {
+          // Try articles first
+          let docSnap = await getDoc(doc(db, "articles", id));
+          if (!docSnap.exists()) {
+            // Try drafts next
+            docSnap = await getDoc(doc(db, "drafts", id));
+          }
 
-          // Advanced SEO
-          setSeoTitle(data.seo_title || "");
-          setMetaDescription(data.meta_description || "");
-          setSlug(data.slug || "");
-          setCanonicalUrl(data.canonical_url || "");
-          setRobotsMeta(data.robots_meta || "index, follow");
-          setOgTitle(data.og_title || "");
-          setOgDescription(data.og_description || "");
-          setOgImage(data.og_image || "");
-          setTwitterCard(data.twitter_card || "summary_large_image");
-          setSchemaData(data.schema_data || "");
-          setFeaturedImageAlt(data.featured_image_alt || "");
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTitle(data.title || "");
+            setSubtitle(data.subtitle || "");
+            setFeaturedImage(data.featured_image || "");
+            setCategoryId(data.category_id || "");
+            editor?.commands.setContent(data.content || "");
 
-          // FAQs and Related
-          setFaqs(data.faqs || []);
-          setRelatedArticleIds(data.related_article_ids || []);
-        });
+            // Advanced SEO
+            setSeoTitle(data.seo_title || "");
+            setMetaDescription(data.meta_description || "");
+            setSlug(data.slug || "");
+            setCanonicalUrl(data.canonical_url || "");
+            setRobotsMeta(data.robots_meta || "index, follow");
+            setOgTitle(data.og_title || "");
+            setOgDescription(data.og_description || "");
+            setOgImage(data.og_image || "");
+            setTwitterCard(data.twitter_card || "summary_large_image");
+            setSchemaData(data.schema_data || "");
+            setFeaturedImageAlt(data.featured_image_alt || "");
+
+            // FAQs and Related
+            setFaqs(data.faqs || []);
+            setRelatedArticleIds(data.related_article_ids || []);
+          }
+        } catch (err) {
+          console.error("Error loading article from Firestore:", err);
+        }
+      };
+      loadArticle();
     }
   }, [id, editor]);
 
   // Fetch all articles for suggestions
   useEffect(() => {
-    fetch("/api/articles")
-      .then((r) => r.json())
-      .then((data) => {
-        // Filter out the active article
-        setAllArticles(data.filter((a: any) => a.id !== id));
-      })
-      .catch(console.error);
+    const loadSuggestions = async () => {
+      try {
+        const articlesList: any[] = [];
+        const snapPub = await getDocs(collection(db, "articles"));
+        snapPub.forEach(d => {
+          articlesList.push({ id: d.id, ...d.data() });
+        });
+
+        const snapDraft = await getDocs(collection(db, "drafts"));
+        snapDraft.forEach(d => {
+          articlesList.push({ id: d.id, ...d.data() });
+        });
+
+        setAllArticles(articlesList.filter((a: any) => a.id !== id));
+      } catch (err) {
+        console.error("Error loading suggestions from Firestore:", err);
+      }
+    };
+    loadSuggestions();
   }, [id]);
 
   // Auto-generate Slug & SEO Fields on Title Change
@@ -205,7 +243,12 @@ export function EditorPage() {
     setSaving(true);
     const content = editor.getHTML();
 
-    const payload = {
+    const docId = id && id !== "new" ? id : "a_" + Date.now();
+    const isPublished = status === "published";
+    const resolvedSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    const payload: any = {
+      id: docId,
       title,
       subtitle,
       category_id: categoryId,
@@ -218,7 +261,7 @@ export function EditorPage() {
       // Advanced SEO settings
       seo_title: seoTitle || title,
       meta_description: metaDescription || subtitle,
-      slug: slug || title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      slug: resolvedSlug,
       canonical_url: canonicalUrl,
       robots_meta: robotsMeta,
       og_title: ogTitle || seoTitle || title,
@@ -231,31 +274,42 @@ export function EditorPage() {
       // Blocks settings
       faqs,
       related_article_ids: relatedArticleIds,
+      updated_at: new Date().toISOString(),
     };
 
     try {
-      const url = id && id !== "new" ? `/api/articles/${id}` : "/api/articles";
-      const method = id && id !== "new" ? "PUT" : "POST";
-
-      const res = await apiFetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const textData = await res.text();
-      let data: any = null;
-      try {
-        if (textData) {
-          data = JSON.parse(textData);
+      if (id === "new") {
+        payload.created_at = new Date().toISOString();
+        payload.published_at = isPublished ? new Date().toISOString() : null;
+        payload.view_count = 0;
+      } else {
+        // Fetch original to preserve created_at / view_count
+        let originalDoc = await getDoc(doc(db, "articles", id));
+        if (!originalDoc.exists()) {
+          originalDoc = await getDoc(doc(db, "drafts", id));
         }
-      } catch (e) {
-        // Not valid JSON
+        if (originalDoc.exists()) {
+          const originalData = originalDoc.data();
+          payload.created_at = originalData.created_at || new Date().toISOString();
+          payload.view_count = originalData.view_count || 0;
+          payload.published_at = originalData.published_at;
+          
+          if (isPublished && !payload.published_at) {
+            payload.published_at = new Date().toISOString();
+          }
+        }
       }
 
-      if (!res.ok) {
-        const errorMsg = data?.error || data?.message || textData || `HTTP ${res.status} ${res.statusText}`;
-        throw new Error(`Server error (${res.status}): ${errorMsg}`);
+      // If we are updating an existing article, delete from the opposite collection in case the status changed
+      if (id && id !== "new") {
+        const oppositeCol = isPublished ? "drafts" : "articles";
+        await deleteDoc(doc(db, oppositeCol, docId));
       }
+
+      // Save to correct collection
+      const targetCol = isPublished ? "articles" : "drafts";
+      await setDoc(doc(db, targetCol, docId), payload);
+
       setSaving(false);
       navigate("/admin/articles");
     } catch (e: any) {
@@ -744,13 +798,13 @@ export function EditorPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-extrabold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                     <span>SEO Meta Title</span>
-                    <span className={`text-[10px] font-bold ${seoTitle.length > 60 ? "text-red-500" : "text-emerald-500"}`}>
-                      {seoTitle.length} / 60 chars
+                    <span className={`text-[10px] font-bold ${(seoTitle || title).length > 60 ? "text-red-500" : "text-emerald-500"}`}>
+                      {(seoTitle || title).length} / 60 chars
                     </span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Title tag..."
+                    placeholder={title || "Title tag..."}
                     className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 bg-white outline-none focus:border-brand-500"
                     value={seoTitle}
                     onChange={(e) => setSeoTitle(e.target.value)}
@@ -761,12 +815,12 @@ export function EditorPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-extrabold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                     <span>Meta Description</span>
-                    <span className={`text-[10px] font-bold ${metaDescription.length > 160 ? "text-red-500" : "text-emerald-500"}`}>
-                      {metaDescription.length} / 160 chars
+                    <span className={`text-[10px] font-bold ${(metaDescription || subtitle).length > 160 ? "text-red-500" : "text-emerald-500"}`}>
+                      {(metaDescription || subtitle).length} / 160 chars
                     </span>
                   </label>
                   <textarea
-                    placeholder="Describe content briefly to display in SERP..."
+                    placeholder={subtitle || "Describe content briefly to display in SERP..."}
                     rows={3}
                     className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3 bg-white outline-none focus:border-brand-500 resize-none"
                     value={metaDescription}
@@ -817,7 +871,7 @@ export function EditorPage() {
                       <span className="text-gray-400 block mb-1">OG Title Override</span>
                       <input
                         type="text"
-                        placeholder="Default is SEO Title"
+                        placeholder={seoTitle || title || "Default is SEO Title"}
                         className="w-full border border-gray-100 rounded-lg p-2.5 outline-none text-sm"
                         value={ogTitle}
                         onChange={(e) => setOgTitle(e.target.value)}
@@ -826,7 +880,7 @@ export function EditorPage() {
                     <div>
                       <span className="text-gray-400 block mb-1">OG Description</span>
                       <textarea
-                        placeholder="Default is Meta Description"
+                        placeholder={metaDescription || subtitle || "Default is Meta Description"}
                         rows={2}
                         className="w-full border border-gray-100 rounded-lg p-2.5 outline-none text-sm resize-none"
                         value={ogDescription}
@@ -837,7 +891,7 @@ export function EditorPage() {
                       <span className="text-gray-400 block mb-1">OG Image Link</span>
                       <input
                         type="text"
-                        placeholder="Default is Cover Image URL"
+                        placeholder={featuredImage || "Default is Cover Image URL"}
                         className="w-full border border-gray-100 rounded-lg p-2.5 outline-none text-sm"
                         value={ogImage}
                         onChange={(e) => setOgImage(e.target.value)}

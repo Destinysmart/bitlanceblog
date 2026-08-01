@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { doc, updateDoc, increment, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -20,6 +22,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 export function ArticlePage() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const viewCountUpdated = useRef(false);
   const [article, setArticle] = useState<any>(null);
   const [author, setAuthor] = useState<any>(null);
   const [authorStats, setAuthorStats] = useState({
@@ -40,6 +43,11 @@ export function ArticlePage() {
   const [topics, setTopics] = useState<any[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  // Reset view count guard whenever the article slug changes
+  useEffect(() => {
+    viewCountUpdated.current = false;
+  }, [slug]);
 
   // Smooth scroll to top on article navigation
   useEffect(() => {
@@ -84,7 +92,7 @@ export function ArticlePage() {
           if (other.category_id === article.category_id) score += 15;
           // Same author gets a small score boost
           if (other.author_id === article.author_id) score += 3;
-          
+
           // Shared tags boost relevance significantly
           if (Array.isArray(article.tags) && Array.isArray(other.tags)) {
             const currentTags = new Set(article.tags.map((t: string) => t.toLowerCase().trim()));
@@ -104,14 +112,14 @@ export function ArticlePage() {
             return new Date(b.article.published_at || b.article.created_at).getTime() - new Date(a.article.published_at || a.article.created_at).getTime();
           })
           .map((item: any) => item.article);
-          
+
         setRelatedArticles(sortedRelated.slice(0, 3));
 
         // Compute chronological next and previous articles for fluid sequential navigation
         const chronologicalList = [...data].sort((a: any, b: any) => {
           return new Date(a.published_at || a.created_at).getTime() - new Date(b.published_at || b.created_at).getTime();
         });
-        
+
         const currentIndex = chronologicalList.findIndex((a: any) => a.id === article.id);
         if (currentIndex !== -1) {
           setPrevArticle(currentIndex > 0 ? chronologicalList[currentIndex - 1] : null);
@@ -147,8 +155,8 @@ export function ArticlePage() {
       .then((data) => {
         // Parse HTML to extract headers and add IDs
         const parser = new DOMParser();
-        const doc = parser.parseFromString(data.content, "text/html");
-        const headers = doc.querySelectorAll("h2, h3");
+        const parsedDoc = parser.parseFromString(data.content, "text/html");
+        const headers = parsedDoc.querySelectorAll("h2, h3");
         const extractedToc: { id: string; text: string; level: number }[] = [];
 
         headers.forEach((header, index) => {
@@ -164,7 +172,31 @@ export function ArticlePage() {
         });
 
         setToc(extractedToc);
-        setArticle({ ...data, content: doc.body.innerHTML });
+        setArticle({ ...data, content: parsedDoc.body.innerHTML });
+
+        if (data.id) {
+          // Old method (API endpoint) — commented out
+          // fetch(`/api/articles/${data.id}/view`, { method: "POST" })
+          //   .catch((error) => console.error("Unable to update article view count:", error));
+
+          // Direct Firestore update — guarded by ref to prevent StrictMode double-fire
+          if (!viewCountUpdated.current) {
+            viewCountUpdated.current = true;
+            const articleRef = doc(db, "articles", data.id);
+            getDoc(articleRef)
+              .then((snap) => {
+                if (snap.exists()) {
+                  updateDoc(articleRef, { view_count: increment(1) });
+                } else {
+                  const draftRef = doc(db, "drafts", data.id);
+                  updateDoc(draftRef, { view_count: increment(1) }).catch((err) =>
+                    console.error("Unable to update view count:", err)
+                  );
+                }
+              })
+              .catch((err) => console.error("Unable to update view count:", err));
+          }
+        }
 
         // Check if bookmarked
         fetch(`/api/bookmarks/check/${data.id}`, {
@@ -284,10 +316,10 @@ export function ArticlePage() {
     const html = article.content;
     const recommendation = relatedArticles[0] || null;
     if (!recommendation) return html;
-    
+
     const paragraphs = html.split("</p>");
     if (paragraphs.length < 3) return html;
-    
+
     const cardHtml = `
       <div class="my-8 p-6 bg-[#FFFBF7] border border-brand-100 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 not-prose hover:bg-[#FFFBF7]/80 transition-all shadow-sm">
         <div class="flex items-center gap-3">
@@ -302,7 +334,7 @@ export function ArticlePage() {
         <a href="/article/${recommendation.slug || recommendation.id}" class="inline-flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs shrink-0 self-stretch sm:self-auto text-center">Read Now</a>
       </div>
     `;
-    
+
     paragraphs[1] = paragraphs[1] + "</p>" + cardHtml;
     return paragraphs.join("</p>");
   };
@@ -679,11 +711,10 @@ export function ArticlePage() {
                   <button
                     onClick={toggleFollow}
                     className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold border transition-colors shadow-sm
-                    ${
-                      isFollowing
+                    ${isFollowing
                         ? "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                         : "bg-brand-500 border-transparent text-white hover:bg-brand-600"
-                    }`}
+                      }`}
                   >
                     {isFollowing ? (
                       <>
@@ -776,7 +807,7 @@ export function ArticlePage() {
                   <p className="text-gray-500 text-xs leading-relaxed mb-4 line-clamp-2 flex-grow font-medium">
                     {rel.subtitle || rel.content?.replace(/<[^>]+>/g, "").substring(0, 100)}...
                   </p>
-                  
+
                   {/* Metadata Row */}
                   <div className="flex items-center gap-3 pt-3 border-t border-gray-50 mt-auto">
                     <img

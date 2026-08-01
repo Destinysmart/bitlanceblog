@@ -1,36 +1,84 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Edit, Trash2, AlertTriangle, X } from "lucide-react";
-import { apiFetch } from "../../lib/api";
+import { collection, doc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 
 export function AdminArticles() {
-  const [articles, setArticles] = useState([]);
+  const [articles, setArticles] = useState<any[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchArticles = () => {
-    fetch("/api/articles")
-      .then(r => r.json())
-      .then(setArticles);
+  // Keep a merged map of all articles from both collections so both
+  // realtime listeners can update independently without overwriting each other
+  const articlesMapRef = useRef<Map<string, any>>(new Map());
+
+  const syncToState = () => {
+    const merged = Array.from(articlesMapRef.current.values());
+    merged.sort(
+      (a, b) =>
+        new Date(b.published_at || b.created_at || 0).getTime() -
+        new Date(a.published_at || a.created_at || 0).getTime()
+    );
+    setArticles(merged);
   };
 
   useEffect(() => {
-    fetchArticles();
+    // Realtime listener on published articles
+    const unsubPublished = onSnapshot(
+      collection(db, "articles"),
+      (snap) => {
+        snap.docs.forEach((d) =>
+          articlesMapRef.current.set(d.id, { ...d.data(), id: d.id })
+        );
+        // Remove deleted docs
+        snap.docChanges().forEach((change) => {
+          if (change.type === "removed") {
+            articlesMapRef.current.delete(change.doc.id);
+          }
+        });
+        syncToState();
+      },
+      (err) => console.error("Error listening to articles:", err)
+    );
+
+    // Realtime listener on drafts
+    const unsubDrafts = onSnapshot(
+      collection(db, "drafts"),
+      (snap) => {
+        snap.docs.forEach((d) =>
+          articlesMapRef.current.set(d.id, { ...d.data(), id: d.id })
+        );
+        snap.docChanges().forEach((change) => {
+          if (change.type === "removed") {
+            articlesMapRef.current.delete(change.doc.id);
+          }
+        });
+        syncToState();
+      },
+      (err) => console.error("Error listening to drafts:", err)
+    );
+
+    // Cleanup both listeners on unmount
+    return () => {
+      unsubPublished();
+      unsubDrafts();
+    };
   }, []);
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
     setIsDeleting(true);
-    apiFetch(`/api/articles/${deleteId}`, { method: "DELETE" })
-      .then(() => {
-        fetchArticles();
-        setDeleteId(null);
-        setIsDeleting(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setIsDeleting(false);
-      });
+    try {
+      await deleteDoc(doc(db, "articles", deleteId));
+      await deleteDoc(doc(db, "drafts", deleteId));
+      // No need to manually refetch — onSnapshot handles it
+      setDeleteId(null);
+    } catch (err) {
+      console.error("Error deleting document from Firestore:", err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -54,11 +102,10 @@ export function AdminArticles() {
                 <div className="font-bold text-gray-950 hover:text-brand-600 transition-colors line-clamp-2">
                   <Link to={`/admin/editor/${article.id}`}>{article.title || "Untitled"}</Link>
                 </div>
-                <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                  article.status === 'published' 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                    : 'bg-amber-50 text-amber-700 border-amber-100'
-                }`}>
+                <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${article.status === 'published'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                  : 'bg-amber-50 text-amber-700 border-amber-100'
+                  }`}>
                   {article.status}
                 </span>
               </div>
@@ -67,14 +114,14 @@ export function AdminArticles() {
                 <div className="flex items-center gap-1">Views: {(article.view_count || 0).toLocaleString()}</div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50 mt-3">
-                <Link 
-                  to={`/admin/editor/${article.id}`} 
+                <Link
+                  to={`/admin/editor/${article.id}`}
                   className="flex-1 flex justify-center items-center gap-1.5 p-2.5 bg-gray-50 text-gray-700 rounded-xl font-bold text-sm transition-colors hover:bg-gray-100"
                 >
                   <Edit className="h-4 w-4" /> Edit
                 </Link>
-                <button 
-                  onClick={() => setDeleteId(article.id)} 
+                <button
+                  onClick={() => setDeleteId(article.id)}
                   className="flex-1 flex justify-center items-center gap-1.5 p-2.5 bg-red-50 text-red-600 rounded-xl font-bold text-sm transition-colors hover:bg-red-100"
                 >
                   <Trash2 className="h-4 w-4" /> Delete
@@ -112,11 +159,10 @@ export function AdminArticles() {
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                      article.status === 'published' 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                        : 'bg-amber-50 text-amber-700 border-amber-100'
-                    }`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${article.status === 'published'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      : 'bg-amber-50 text-amber-700 border-amber-100'
+                      }`}>
                       {article.status}
                     </span>
                   </td>
@@ -125,15 +171,15 @@ export function AdminArticles() {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center justify-end gap-3 text-gray-400">
-                      <Link 
-                        to={`/admin/editor/${article.id}`} 
+                      <Link
+                        to={`/admin/editor/${article.id}`}
                         className="p-2 hover:text-brand-500 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-100"
                         title="Edit article"
                       >
                         <Edit className="h-4.5 w-4.5" />
                       </Link>
-                      <button 
-                        onClick={() => setDeleteId(article.id)} 
+                      <button
+                        onClick={() => setDeleteId(article.id)}
                         className="p-2 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
                         title="Delete article"
                       >
@@ -159,10 +205,10 @@ export function AdminArticles() {
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-xs transition-opacity" onClick={() => setDeleteId(null)} />
-          
+
           <div className="relative bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 transform transition-all animate-scale-up">
             <div className="absolute top-4 right-4">
-              <button 
+              <button
                 onClick={() => setDeleteId(null)}
                 className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
               >

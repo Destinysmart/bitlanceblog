@@ -389,8 +389,8 @@
   "categories": [
     {
       "id": "c1",
-      "name": "Product",
-      "slug": "product"
+      "name": "Product Updates",
+      "slug": "product-updates"
     },
     {
       "id": "c2",
@@ -399,8 +399,8 @@
     },
     {
       "id": "c3",
-      "name": "Guides",
-      "slug": "guides"
+      "name": "Getting Started",
+      "slug": "getting-started"
     },
     {
       "id": "c4",
@@ -409,23 +409,13 @@
     },
     {
       "id": "c5",
-      "name": "News",
-      "slug": "news"
+      "name": "Bitcoin & Lightning",
+      "slug": "bitcoin-lightning"
     },
     {
       "id": "c6",
-      "name": "Community",
-      "slug": "community"
-    },
-    {
-      "id": "c7",
-      "name": "Support",
-      "slug": "support"
-    },
-    {
-      "id": "c8",
-      "name": "Announcements",
-      "slug": "announcements"
+      "name": "Insights",
+      "slug": "insights"
     }
   ],
   "topics": [
@@ -518,7 +508,163 @@
     }
   ],
   "tags": [],
-  "users": [
+  "users": [],
+  "media": [
+    {
+      "id": "m_1785391869542",
+      "filename": "BitLance Site Update.png",
+      "thumbnailFilename": "BitLance Site Update.png",
+      "url": "/uploads/bitlance-site-update.webp",
+      "thumbnailUrl": "/uploads/thumb-bitlance-site-update.webp",
+      "originalName": "BitLance Site Update.png",
+      "mimeType": "image/webp",
+      "size": 70391,
+      "altText": "bitlance site update",
+      "title": "bitlance site update",
+      "caption": "",
+      "description": "",
+      "createdAt": "2026-07-30T06:11:09.542Z",
+      "aiMetadata": {
+        "context": "Contextual image representing bitlance site update for BitLance platform.",
+        "keywords": [
+          "bitcoin",
+          "freelancing",
+          "remote-work",
+          "lightning-network",
+          "tech"
+        ],
+        "schemaJsonLd": {
+          "@context": "https://schema.org",
+          "@type": "ImageObject",
+          "contentUrl": "/uploads/bitlance-site-update.webp",
+          "creator": {
+            "@type": "Organization",
+            "name": "BitLance Team"
+          },
+          "caption": "bitlance site update",
+          "description": "Contextual image representing bitlance site update for BitLance platform.",
+          "keywords": "bitcoin, freelancing, remote-work, lightning-network, tech",
+          "name": "BitLance Site Update.png"
+        }
+      }
+    },
+    {
+      "id": "m_1785397137948",
+      "filename": "IMG_7040 (1).PNG",
+      "thumbnailFilename": "IMG_7040 (1).PNG",
+      "url": "/uploads/img-7040-1.webp",
+      "thumbnailUrl": "/uploads/thumb-img-7040-1.webp",
+      "originalName": "IMG_7040 (1).PNG",
+      "mimeType": "image/webp",
+      "size": 4239,
+      "altText": "img 7040 1",
+      "title": "img 7040 1",
+      "caption": "",
+      "description": "",
+      "createdAt": "2026-07-30T07:38:57.948Z",
+      "aiMetadata": {
+        "context": "Contextual image representing img 7040 1 for BitLance platform.",
+        "keywords": [
+          "bitcoin",
+          "freelancing",
+          "remote-work",
+          "lightning-network",
+          "tech"
+        ],
+        "schemaJsonLd": {
+          "@context": "https://schema.org",
+          "@type": "ImageObject",
+          "contentUrl": "/uploads/img-7040-1.webp",
+          "creator": {
+            "@type": "Organization",
+            "name": "BitLance Team"
+          },
+          "caption": "img 7040 1",
+          "description": "Contextual image representing img 7040 1 for BitLance platform.",
+          "keywords": "bitcoin, freelancing, remote-work, lightning-network, tech",
+          "name": "IMG_7040 (1).PNG"
+        }
+      }
+    },
+    {
+      "id": "m_1785409004792",
+      "filename": "logo.jpeg",
+      "thumbnailFilename": "logo.jpeg",
+      "url": "/uploads/logo.webp",
+      "thumbnailUrl": "/uploads/thumb-logo.webp",
+      "originalName": "logo.jpeg",
+      "mimeType": "image/webp",
+      "size": 4919,
+      "altText": "logo",
+      "title": "logo",
+      "caption": "",
+      "description": "",
+      "createdAt": "2026-07-30T10:56:44.792Z",
+      "aiMetadata": {
+        "context": "Contextual image representing logo for BitLance platform.",
+        "keywords": [
+          "bitcoin",
+          "freelancing",
+          "remote-work",
+          "lightning-network",
+          "tech"
+        ],
+        "schemaJsonLd": {
+          "@context": "https://schema.org",
+          "@type": "ImageObject",
+          "contentUrl": "/uploads/logo.webp",
+          "creator": {
+            "@type": "Organization",
+            "name": "BitLance Team"
+          },
+          "caption": "logo",
+          "description": "Contextual image representing logo for BitLance platform.",
+          "keywords": "bitcoin, freelancing, remote-work, lightning-network, tech",
+          "name": "logo.jpeg"
+        }
+      }
+    },
+    {
+      "id": "m_1785409266717",
+      "filename": "logo.jpeg",
+      "thumbnailFilename": "logo.jpeg",
+      "url": "/uploads/logo-1.webp",
+      "thumbnailUrl": "/uploads/thumb-logo-1.webp",
+      "originalName": "logo.jpeg",
+      "mimeType": "image/webp",
+      "size": 4919,
+      "altText": "logo",
+      "title": "logo",
+      "caption": "",
+      "description": "",
+      "createdAt": "2026-07-30T11:01:06.717Z",
+      "aiMetadata": {
+        "context": "Contextual image representing logo for BitLance platform.",
+        "keywords": [
+          "bitcoin",
+          "freelancing",
+          "remote-work",
+          "lightning-network",
+          "tech"
+        ],
+        "schemaJsonLd": {
+          "@context": "https://schema.org",
+          "@type": "ImageObject",
+          "contentUrl": "/uploads/logo-1.webp",
+          "creator": {
+            "@type": "Organization",
+            "name": "BitLance Team"
+          },
+          "caption": "logo",
+          "description": "Contextual image representing logo for BitLance platform.",
+          "keywords": "bitcoin, freelancing, remote-work, lightning-network, tech",
+          "name": "logo.jpeg"
+        }
+      }
+    }
+  ],
+  "drafts": [],
+  "authors": [
     {
       "id": "admin-1",
       "role": "admin",
@@ -532,5 +678,5 @@
       "avatar": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"
     }
   ],
-  "media": []
+  "settings": []
 }

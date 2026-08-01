@@ -12,6 +12,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@cloudinary/react": "^1.14.4",
+    "@cloudinary/url-gen": "^1.22.0",
     "@google/genai": "^2.4.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tiptap/extension-character-count": "^3.26.1",

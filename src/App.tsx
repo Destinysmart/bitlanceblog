@@ -49,9 +49,10 @@ export default function App() {
               {/* Admin Authentication Gate */}
               <Route path="/admin/login" element={<AdminLogin />} />
 
-              {/* Protected Admin Routes */}
-              <Route element={<AdminGuard />}>
-                <Route path="/admin" element={<AdminLayout />}>
+              {/* Protected Admin Routes — AdminGuard wraps AdminLayout so
+                  unauthenticated users are redirected before any admin UI renders */}
+              <Route path="/admin" element={<AdminGuard />}>
+                <Route element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
                   <Route path="articles" element={<AdminArticles />} />
                   <Route path="users" element={<AdminUsers />} />

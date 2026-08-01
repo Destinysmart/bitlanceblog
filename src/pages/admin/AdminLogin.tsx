@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { auth } from "../../lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Shield, Lock, Mail, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
@@ -10,13 +10,14 @@ export function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  // If user was redirected here from a protected route, send them back after login
+  const from = (location.state as any)?.from?.pathname || "/admin";
 
   // Guard: if already logged in, redirect to admin index
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        navigate("/admin");
-      }
+      if (user) navigate(from, { replace: true });
     });
     return () => unsubscribe();
   }, [navigate]);
@@ -32,9 +33,8 @@ export function AdminLogin() {
     setErrorMsg("");
 
     try {
-      // Attempt sign in
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/admin");
+      navigate(from, { replace: true });
     } catch (err: any) {
       console.error("Auth error:", err);
       // Friendly error translation
@@ -143,7 +143,7 @@ export function AdminLogin() {
 
           <div className="mt-6 border-t border-gray-150 pt-5 text-center">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-brand-500" /> Powered by Firebase Security
+              {/* <Shield className="w-3.5 h-3.5 text-brand-500" /> Powered by Firebase Security */}
             </span>
           </div>
         </div>
