@@ -223,7 +223,8 @@ async function syncCategoriesOnce() {
 // Emails granted admin API access. Override with a comma-separated
 // ADMIN_EMAILS env var. Any authenticated user NOT on this list is rejected —
 // public signup accounts must never reach admin endpoints.
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "smartdestinyonyekachi@gmail.com")
+// Admin moved to the company account on 8 Nov 2026 (the founder's personal email is for freelancing).
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "bitlance1@gmail.com")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
