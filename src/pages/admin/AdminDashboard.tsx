@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "../../lib/api";
 import { Link } from "react-router-dom";
 import { 
   Plus, Eye, ThumbsUp, Share2, BookOpen, 
@@ -14,7 +15,7 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/articles")
+    apiFetch("/api/articles")
       .then(r => r.json())
       .then(data => {
         if (!Array.isArray(data)) return;

@@ -185,7 +185,8 @@ async function seedFirestoreIfNeeded() {
 }
 
 // Trigger initial seed check on load
-seedFirestoreIfNeeded();
+// Disabled 8 Nov 2026: the server must not write to the database without an admin login.
+// seedFirestoreIfNeeded();
 
 async function syncCategoriesOnce() {
   try {
@@ -213,7 +214,8 @@ async function syncCategoriesOnce() {
     console.error("Failed to sync Firestore categories on boot:", err);
   }
 }
-syncCategoriesOnce();
+// Disabled 8 Nov 2026: categories are already set; this deleted and rewrote them on every start.
+// syncCategoriesOnce();
 
 // ---------------------------------------------------------------------------
 // Security: Firebase Auth Token Verification Middleware
@@ -226,10 +228,44 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "smartdestinyonyekachi@gmail.c
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
+// Verifies a Firebase ID token by asking Google (Identity Toolkit accounts:lookup). Google
+// rejects forged or expired tokens, so no service account is needed. Returns the account's
+// email and uid, or null.
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || "AIzaSyC3u6AUI8q8RI7rnjFCbBQsEDlBel0Y8Tc";
+async function verifyAdminToken(token: string): Promise<{ uid: string; email: string } | null> {
+  if (!token || token.length > 4096) return null;
+  try {
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: token }),
+    });
+    if (!r.ok) return null;
+    const data: any = await r.json();
+    const user = data?.users?.[0];
+    const email = String(user?.email || "").toLowerCase();
+    if (!user?.localId || !email || !ADMIN_EMAILS.includes(email)) return null;
+    return { uid: user.localId, email };
+  } catch {
+    return null;
+  }
+}
+
+const bearer = (req: any) => {
+  const h = String(req.headers?.["authorization"] || "");
+  return h.startsWith("Bearer ") ? h.slice(7) : "";
+};
+
+// Admin-only routes. Before 8 Nov 2026 this let every request through.
 async function adminAuthMiddleware(req: any, res: any, next: any) {
-  req.user = { uid: "mock-admin-uid", email: ADMIN_EMAILS[0] || "admin@example.com" };
+  const admin = await verifyAdminToken(bearer(req));
+  if (!admin) return res.status(401).json({ error: "Admin sign-in required." });
+  req.user = admin;
   next();
 }
+
+/** True when the request carries a valid admin token (used to show drafts only to admins). */
+const isAdminRequest = async (req: any) => !!(await verifyAdminToken(bearer(req)));
 
 // ---------------------------------------------------------------------------
 // Express Application Router
@@ -828,6 +864,9 @@ app.get("/api/articles", async (req, res) => {
   try {
     const articles: any[] = [];
     const statusQuery = req.query.status as string;
+    // Drafts are private: only a signed-in admin gets them.
+    const admin = statusQuery === "published" ? false : await isAdminRequest(req);
+    if (statusQuery === "draft" && !admin) return res.status(401).json({ error: "Admin sign-in required." });
 
     if (!statusQuery || statusQuery === "published") {
       const snap = await getDocs(articlesCol());
@@ -836,7 +875,7 @@ app.get("/api/articles", async (req, res) => {
       });
     }
 
-    if (!statusQuery || statusQuery === "draft") {
+    if (admin && (!statusQuery || statusQuery === "draft")) {
       const snap = await getDocs(draftsCol());
       snap.forEach(d => {
         articles.push({ id: d.id, ...d.data() });
@@ -875,6 +914,9 @@ app.get("/api/articles/:slug", async (req, res) => {
     if (docPub.exists()) {
       return res.json({ ...docPub.data(), id: docPub.id });
     }
+
+    // Drafts (steps 3 and 4) are only for a signed-in admin.
+    if (!(await isAdminRequest(req))) return res.status(404).json({ error: "Article not found" });
 
     // 3. Try finding in drafts by slug
     const qDraft = query(draftsCol(), where("slug", "==", slugOrId));
@@ -989,14 +1031,7 @@ app.post("/api/articles/:id/view", async (req, res) => {
       return res.json({ success: true, view_count: current + 1 });
     }
 
-    // Try drafts collection by Firestore doc ID
-    const draftRef = doc(db, "drafts", id);
-    const draftSnap = await getDoc(draftRef);
-    if (draftSnap.exists()) {
-      const current = (draftSnap.data().view_count || 0) as number;
-      await updateDoc(draftRef, { view_count: current + 1 });
-      return res.json({ success: true, view_count: current + 1 });
-    }
+    // Views are only counted for published articles (drafts are private).
 
     // Fallback: query by stored 'id' field (in case doc ID differs from stored id)
     const qPub = query(articlesCol(), where("id", "==", id));
@@ -1008,14 +1043,6 @@ app.post("/api/articles/:id/view", async (req, res) => {
       return res.json({ success: true, view_count: current + 1 });
     }
 
-    const qDraft = query(draftsCol(), where("id", "==", id));
-    const qDraftSnap = await getDocs(qDraft);
-    if (!qDraftSnap.empty) {
-      const d = qDraftSnap.docs[0];
-      const current = (d.data().view_count || 0) as number;
-      await updateDoc(doc(db, "drafts", d.id), { view_count: current + 1 });
-      return res.json({ success: true, view_count: current + 1 });
-    }
 
     res.status(404).json({ error: "Article not found" });
   } catch (err: any) {
